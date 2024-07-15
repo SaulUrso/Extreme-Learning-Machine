@@ -36,6 +36,5 @@ class ELM:
 
     def predict(self, X):
         return (
-            self.sigmoid(X @ self.input_weights + self.bias)
-            @ self.output_weights
+            self.tanh(X @ self.input_weights + self.bias) @ self.output_weights
         )
