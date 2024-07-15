@@ -76,3 +76,16 @@ def kfold(df_design, fold_num=5, normalize=True, seed=0):
             )
 
     return fold_sets
+
+
+def obtain_features_targets(df):
+    feature_cols = [f"x{i}" for i in range(1, 11)]  # feature column names
+    target_cols = [f"y{i}" for i in range(1, 4)]  # target column names
+
+    X = df[feature_cols].values
+    y = df[target_cols].values
+
+    # check data type is float64
+    assert X.dtype == "float64"
+    assert y.dtype == "float64"
+    return X, y
