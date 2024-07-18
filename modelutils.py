@@ -41,3 +41,21 @@ class ELM:
             self.tanh(X @ self.input_weights + self.b_in) @ self.output_weights
             + self.b_out
         )
+
+
+def compute_loss(y_true, y_pred, alpha=0):
+    """
+    Compute the loss between the true labels and predicted labels.
+
+    Parameters:
+    - y_true: numpy array, true labels
+    - y_pred: numpy array, predicted labels
+    - alpha: float, regularization parameter (default: 0)
+
+    Returns:
+    - loss: float, computed loss value
+    """
+    return (
+        np.linalg.norm(y_true - y_pred, "fro") ** 2
+        + alpha * np.linalg.norm(y_pred, "fro") ** 2
+    )
