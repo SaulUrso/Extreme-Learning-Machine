@@ -18,15 +18,17 @@ class ELM:
             self.input_weights = np.random.randn(
                 input_size, hidden_size
             ) / np.sqrt(input_size)
-            self.bias = np.random.randn(hidden_size) / np.sqrt(input_size)
+            self.b_in = np.random.randn(hidden_size) / np.sqrt(input_size)
             self.output_weights = np.random.randn(
                 hidden_size, output_size
             ) / np.sqrt(hidden_size)
+            self.b_out = np.random.randn(output_size) / np.sqrt(hidden_size)
 
         elif init == "std":
             self.input_weights = np.random.randn(input_size, hidden_size)
-            self.bias = np.random.randn(hidden_size)
+            self.b_in = np.random.randn(hidden_size)
             self.output_weights = np.random.randn(hidden_size, output_size)
+            self.b_out = np.random.randn(output_size)
 
         else:
             raise ValueError("Invalid initialization type.")
@@ -36,5 +38,6 @@ class ELM:
 
     def predict(self, X):
         return (
-            self.tanh(X @ self.input_weights + self.bias) @ self.output_weights
+            self.tanh(X @ self.input_weights + self.b_in) @ self.output_weights
+            + self.b_out
         )
