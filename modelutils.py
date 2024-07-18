@@ -22,13 +22,11 @@ class ELM:
             self.output_weights = np.random.randn(
                 hidden_size, output_size
             ) / np.sqrt(hidden_size)
-            self.b_out = np.random.randn(output_size) / np.sqrt(hidden_size)
 
         elif init == "std":
             self.input_weights = np.random.randn(input_size, hidden_size)
             self.b_in = np.random.randn(hidden_size)
             self.output_weights = np.random.randn(hidden_size, output_size)
-            self.b_out = np.random.randn(output_size)
 
         else:
             raise ValueError("Invalid initialization type.")
@@ -36,11 +34,16 @@ class ELM:
     def tanh(self, x):
         return np.tanh(x)
 
-    def predict(self, X):
-        return (
-            self.tanh(X @ self.input_weights + self.b_in) @ self.output_weights
-            + self.b_out
-        )
+    def predict(self, x):
+        A = self.tanh(x.dot(self.input_weights) + self.b_in)
+        return A.dot(self.output_weights)
+
+    def compute_gradient(self, X, Y, alpha=0):
+        A = self.tanh(X @ self.input_weights + self.b_in)
+        BtB = A.T @ A + alpha * np.eye(self.hidden_size)
+        BtY = A.T @ Y
+        grad = BtB @ self.output_weights - BtY
+        return grad
 
 
 def compute_loss(y_true, y_pred, alpha=0):
