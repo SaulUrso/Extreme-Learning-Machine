@@ -38,11 +38,14 @@ class ELM:
         A = self.tanh(x.dot(self.input_weights) + self.b_in)
         return A.dot(self.output_weights)
 
-    def compute_gradient(self, X, Y, alpha=0):
+    def compute_gradient(self, X, Y, alpha=0, W_out=None):
         A = self.tanh(X @ self.input_weights + self.b_in)
         BtB = A.T @ A + alpha * np.eye(self.hidden_size)
         BtY = A.T @ Y
-        grad = BtB @ self.output_weights - BtY
+        if W_out is not None:
+            grad = BtB @ W_out - BtY
+        else:
+            grad = BtB @ self.output_weights - BtY
         return grad
 
 
@@ -61,4 +64,4 @@ def compute_loss(y_true, y_pred, alpha=0):
     return (
         np.linalg.norm(y_true - y_pred, "fro") ** 2
         + alpha * np.linalg.norm(y_pred, "fro") ** 2
-    )
+    ) / y_true.shape[0]
