@@ -38,10 +38,47 @@ class ELM:
         A = self.tanh(x.dot(self.input_weights) + self.b_in)
         return A.dot(self.output_weights)
 
-    def compute_gradient(self, X, Y, alpha=0, W_out=None):
-        A = self.tanh(X @ self.input_weights + self.b_in)
-        BtB = A.T @ A + alpha * np.eye(self.hidden_size)
-        BtY = A.T @ Y
+    def hidden_activations(self, x):
+        return self.tanh(x.dot(self.input_weights) + self.b_in)
+
+    def compute_gradient(
+        self, X=None, Y=None, alpha=0, W_out=None, BtB=None, BtY=None
+    ):
+        """
+        Compute the gradient of the model's output with respect to the weights.
+
+        Args:
+            X (ndarray, optional): Input data matrix. Defaults to None.
+            Y (ndarray, optional): Target output matrix. Defaults to None.
+            alpha (float, optional): Regularization parameter. Defaults to 0.
+            W_out (ndarray, optional): Output weight matrix. Defaults to None.
+            BtB (ndarray, optional): Precomputed matrix A^T @ A + alpha * I. Defaults to None.
+            BtY (ndarray, optional): Precomputed matrix A^T @ Y. Defaults to None.
+
+        Returns:
+            ndarray: The computed gradient.
+
+        Raises:
+            ValueError: If X and Y are not provided.
+
+        Note:
+            This method computes the gradient of the model's output with respect to the weights.
+            It can be used for accelerated gradient computation by providing precomputed matrix W_out.
+            If W_out is provided, the gradient is computed with respect to W_out, otherwise it is computed with respect to self.output_weights.
+        """  # noqa: E501
+
+        if BtB is None or BtY is None:
+            if X is None or Y is None:
+                raise ValueError("X and Y must be provided.")
+            A = self.tanh(X @ self.input_weights + self.b_in)
+
+        if BtB is None:
+            BtB = A.T @ A + alpha * np.eye(self.hidden_size)
+
+        if BtY is None:
+            BtY = A.T @ Y
+
+        # compute gradients w.r.t different weights (useful for accelerated gradient)
         if W_out is not None:
             grad = BtB @ W_out - BtY
         else:
