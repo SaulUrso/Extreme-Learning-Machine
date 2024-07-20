@@ -17,6 +17,7 @@ def nag(
     eps=np.float64(1e-6),
     verbose=False,
     check_float64=False,
+    fast_mode=False,
 ):
     """
     Perform Nesterov accelerated gradient descent.
@@ -81,10 +82,15 @@ def nag(
     BtB = A.T @ A + alpha * np.eye(model.hidden_size)
     BtY = A.T @ Y
 
+    # compute hidden activation for validation set
+    A_val = model.hidden_activations(X_val)
+
     for epoch in range(max_epochs):
 
+        # compute the true gradient
         true_grad = model.compute_gradient(BtB=BtB, BtY=BtY)
 
+        # check for convergence
         if np.linalg.norm(true_grad, "fro") < eps:
             if verbose:
                 print(f"Converged at epoch for true grad {epoch + 1}")
@@ -95,17 +101,12 @@ def nag(
             print("Warning: NaN gradient encountered")
             break
 
+        # compute the update
         update_grad = model.compute_gradient(
             W_out=model.output_weights + beta * v,
             BtB=BtB,
             BtY=BtY,
         )
-
-        # stop when gradient small enough
-        # if np.linalg.norm(grad, "fro") < eps:
-        #    if verbose:
-        #        print(f"Converged at epoch {epoch + 1}")
-        #    break
 
         # compute velocity
         v = beta * v - lr * update_grad
@@ -113,9 +114,12 @@ def nag(
         # update the weights
         model.output_weights += v
 
+        if fast_mode:
+            continue
+
         # compute the loss
-        loss_train = mu.compute_loss(Y, model.predict(X), alpha)
-        loss_val = mu.compute_loss(Y_val, model.predict(X_val))
+        loss_train = mu.compute_loss(Y, model.predict(A=A), alpha)
+        loss_val = mu.compute_loss(Y_val, model.predict(A=A_val), alpha)
 
         if check_float64:
             if (
@@ -124,10 +128,12 @@ def nag(
             ):
                 raise ValueError("Losses must be of type np.float64")
 
+        # happens when loss explodes
         if np.isnan(loss_train) or np.isnan(loss_val):
             print("Warning: NaN loss encountered")
             break
 
+        # save the loss history
         loss_train_history.append(loss_train)
         loss_val_history.append(loss_val)
 
@@ -135,5 +141,11 @@ def nag(
             print(
                 f"Epoch {epoch + 1}: \t train loss = {loss_train:.8f}, \t val loss = {loss_val:.8f}, \tgrad norm = {np.linalg.norm(true_grad, 'fro'):.8f}"  # noqa
             )
+
+    if fast_mode:
+        loss_train = mu.compute_loss(Y, model.predict(A=A), alpha)
+        loss_val = mu.compute_loss(Y_val, model.predict(A=A_val), alpha)
+        loss_train_history.append(loss_train)
+        loss_val_history.append(loss_val)
 
     return model, loss_train_history, loss_val_history

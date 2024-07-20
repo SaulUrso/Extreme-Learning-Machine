@@ -34,8 +34,11 @@ class ELM:
     def tanh(self, x):
         return np.tanh(x)
 
-    def predict(self, x):
-        A = self.tanh(x.dot(self.input_weights) + self.b_in)
+    def predict(self, x=None, A=None):
+        if A is None:
+            if x is None:
+                raise ValueError("x must be provided.")
+            A = self.tanh(x.dot(self.input_weights) + self.b_in)
         return A.dot(self.output_weights)
 
     def hidden_activations(self, x):
