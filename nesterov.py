@@ -72,31 +72,32 @@ def nag(
     loss_train_history = []
     loss_val_history = []
 
-    # initialize the velocity
-    v = np.zeros_like(model.output_weights)
+    # initialize y
+    y_curr = np.zeros_like(model.output_weights)
+    y_prev = np.zeros_like(model.output_weights)
 
     for epoch in range(max_epochs):
 
-        grad = model.compute_gradient(
-            X, Y, alpha, model.output_weights + beta * v
-        )
+        grad = model.compute_gradient(X, Y, alpha)
+
+        if np.linalg.norm(grad, "fro") < eps:
+            if verbose:
+                print(f"Converged at epoch for true grad {epoch + 1}")
+            break
 
         # happens when gradient explodes
         if np.isnan(grad).any():
             print("Warning: NaN gradient encountered")
             break
 
-        # stop when gradient small enough
-        if np.linalg.norm(grad, "fro") < eps:
-            if verbose:
-                print(f"Converged at epoch {epoch + 1}")
-            break
+        # compute curr y (do gradient step)
+        y_curr = model.output_weights - lr * grad
 
-        # compute velocity
-        v = beta * v - lr * grad
+        # update the weights (do momentum step)
+        model.output_weights = y_curr + beta * (y_curr - y_prev)
 
-        # update the weights
-        model.output_weights += v
+        # update y_prev
+        y_prev = y_curr
 
         # compute the loss
         loss_train = mu.compute_loss(Y, model.predict(X), alpha)
@@ -118,7 +119,7 @@ def nag(
 
         if verbose:
             print(
-                f"Epoch {epoch + 1}: \t train loss = {loss_train:.8f}, \t val loss = {loss_val:.8f}, \tgrad norm = {np.linalg.norm(grad, 'fro'):.8f}"  # noqa
+                f"""Epoch {epoch + 1}: \t train loss = {loss_train:.8f}, \t val loss = {loss_val:.8f}, \t true grad  {np.linalg.norm(grad, 'fro'):.8f}"""  # noqa
             )
 
     return model, loss_train_history, loss_val_history
