@@ -10,9 +10,9 @@ def nag(
     Y,
     X_val,
     Y_val,
-    lr=np.float64(0.01),
+    lr="auto",
     alpha=np.float64(0),
-    beta=np.float64(0),
+    beta="schedule",
     max_epochs=1000,
     eps=np.float64(1e-6),
     verbose=False,
@@ -57,9 +57,7 @@ def nag(
     # check if parameters are of the correct type
     if check_float64:
         if (
-            not lr.dtype == np.float64
-            or not alpha.dtype == np.float64
-            or not beta.dtype == np.float64
+            not alpha.dtype == np.float64
             or not isinstance(max_epochs, int)
             or not eps.dtype == np.float64
         ):
@@ -85,6 +83,12 @@ def nag(
     # compute hidden activation for validation set
     A_val = model.hidden_activations(X_val)
 
+    if beta == "schedule":
+        sched = 1
+        true_beta = 0
+    else:
+        true_beta = beta
+
     for epoch in range(max_epochs):
 
         # compute the true gradient
@@ -101,15 +105,35 @@ def nag(
             print("Warning: NaN gradient encountered")
             break
 
-        # compute the update
+        # compute the update gradient
         update_grad = model.compute_gradient(
-            W_out=model.output_weights + beta * v,
+            W_out=model.output_weights + true_beta * v,
             BtB=BtB,
             BtY=BtY,
         )
 
-        # compute velocity
-        v = beta * v - lr * update_grad
+        if lr == "auto":  # exact line search
+            stepsize = np.linalg.norm(update_grad, "fro") ** 2 / (
+                np.trace(update_grad.T @ BtB @ update_grad) + 1e-8
+            )
+        elif lr == "col":  # exact line search on all columns
+            # obtain 2-norm squared for each column
+            col_norms = np.einsum("ij,ji->i", update_grad.T, update_grad)
+            col_BtB_norms = np.diag(update_grad.T @ BtB @ update_grad)
+            # col_BtB_norms = np.einsum(
+            #    "ij,ji->i", update_grad.T, BtB @ update_grad
+            # )
+            stepsize = col_norms / (col_BtB_norms + 1e-8)
+        else:
+            stepsize = lr
+
+        if beta == "schedule":
+            prec_sched = sched
+            sched = (1 + np.sqrt(1 + 4 * sched**2)) / 2
+            true_beta = (prec_sched - 1) / sched
+
+        # compute momentum
+        v = true_beta * v - stepsize * update_grad
 
         # update the weights
         model.output_weights += v
@@ -148,4 +172,4 @@ def nag(
         loss_train_history.append(loss_train)
         loss_val_history.append(loss_val)
 
-    return model, loss_train_history, loss_val_history
+    return model, loss_train_history, loss_val_history, epoch + 1

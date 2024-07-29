@@ -1,5 +1,7 @@
 #Mac os ignore
 .DS_Store
+Results/*
+Plots/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

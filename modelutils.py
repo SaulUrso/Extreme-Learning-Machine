@@ -6,7 +6,7 @@ import numpy as np
 class ELM:
 
     def __init__(
-        self, input_size, hidden_size, output_size=3, seed=0, init="fan_in"
+        self, input_size, hidden_size, output_size=3, seed=0, init="fan-in"
     ):
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -14,7 +14,7 @@ class ELM:
 
         np.random.seed(seed)
 
-        if init == "fan_in":
+        if init == "fan-in":
             self.input_weights = np.random.randn(
                 input_size, hidden_size
             ) / np.sqrt(input_size)
