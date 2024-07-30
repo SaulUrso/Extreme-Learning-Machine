@@ -83,6 +83,9 @@ def nag(
     # compute hidden activation for validation set
     A_val = model.hidden_activations(X_val)
 
+    # check if there is a problem with the model
+    has_problem = False
+
     if beta == "schedule":
         sched = 1
         true_beta = 0
@@ -102,6 +105,7 @@ def nag(
 
         # happens when gradient explodes
         if np.isnan(true_grad).any():
+            has_problem = True
             print("Warning: NaN gradient encountered")
             break
 
@@ -154,6 +158,7 @@ def nag(
 
         # happens when loss explodes
         if np.isnan(loss_train) or np.isnan(loss_val):
+            has_problem = True
             print("Warning: NaN loss encountered")
             break
 
@@ -172,4 +177,4 @@ def nag(
         loss_train_history.append(loss_train)
         loss_val_history.append(loss_val)
 
-    return model, loss_train_history, loss_val_history, epoch + 1
+    return model, loss_train_history, loss_val_history, epoch + 1, has_problem
