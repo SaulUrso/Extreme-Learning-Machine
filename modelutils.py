@@ -1,6 +1,7 @@
 # the model, a 1 layer extreme learning machine
 
 import numpy as np
+from backfwd import solve_system
 
 
 class ELM:
@@ -87,6 +88,13 @@ class ELM:
         else:
             grad = BtB @ self.output_weights - BtY
         return grad
+
+    def computewoutsystem(self, X, Y, alpha=0):
+        A = self.hidden_activations(X)
+        M = np.matmul(A.T, A) + alpha * np.eye(self.hidden_size)
+        B = np.matmul(A.T, Y)
+
+        self.output_weights = solve_system(M, B)
 
 
 def compute_loss(y_true, y_pred, alpha=0):
