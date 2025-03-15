@@ -47,11 +47,11 @@ class ELM:
         if A is None:
             if x is None:
                 raise ValueError("x must be provided.")
-            A = self.tanh(x.dot(self.input_weights) + self.b_in)
+            A = self.tanh(x.dot(self.input_weights))  # + self.b_in)
         return A.dot(self.output_weights)
 
     def hidden_activations(self, x):
-        return self.tanh(x.dot(self.input_weights) + self.b_in)
+        return self.tanh(x.dot(self.input_weights))  # + self.b_in)
 
     def compute_gradient(self, X=None, Y=None, alpha=0, W_out=None, BtB=None, BtY=None):
         """
@@ -80,7 +80,7 @@ class ELM:
         if BtB is None or BtY is None:
             if X is None or Y is None:
                 raise ValueError("X and Y must be provided.")
-            A = self.tanh(X @ self.input_weights + self.b_in)
+            A = self.tanh(X @ self.input_weights)  # + self.b_in)
 
         if BtB is None:
             BtB = A.T @ A + alpha * np.eye(self.hidden_size)

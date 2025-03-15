@@ -62,9 +62,6 @@ def nag(
                 "lr, alpha, beta, max_epochs and eps must be of type np.float64 and int"
             )
 
-    if verbose:
-        print("Training model using Nesterov accelerated gradient descent...")
-
     loss_train_history = []
     sol_dist_history = []
     grad_history = []
@@ -75,31 +72,45 @@ def nag(
     # compute BtB and BtY, which are fixed throughout the training
     A = model.hidden_activations(X)
 
-    BtB = A.T @ A + alpha * np.eye(model.hidden_size)
+    AtA = A.T @ A  # + alpha * np.eye(model.hidden_size)
+
+    # guarantee posdef in case of numerical errors (happens for large hidden sizes)
+    # NOTE: investigate what gradient descent does, however alpha propably guarantees always posdef
+    eig_min = np.min(np.linalg.eigvals(AtA))
+    old_tau = max(0, -eig_min)
+    BtB = AtA + (old_tau + alpha) * np.eye(model.hidden_size)
+
     BtY = A.T @ Y
 
     # check if there is a problem with the model
     has_problem = False
+    eigenvalues = None
 
     if beta == "schedule":
         sched = 1
         true_beta = 0
     elif beta == "optimal":
-        eigenvalues = np.linalg.eigvals(BtB)
+        eigenvalues = np.linalg.eigvalsh(BtB)
         L = np.max(eigenvalues)
         tau = np.min(eigenvalues)
+
         true_beta = (np.sqrt(L) - np.sqrt(tau)) / (np.sqrt(L) + np.sqrt(tau))
+        if verbose:
+            print(true_beta)
     else:
         true_beta = beta
 
     if lr == "optimal":
-        eigenvalues = np.linalg.eigvals(BtB)
+        if eigenvalues is None:
+            eigenvalues = np.linalg.eigvalsh(BtB)
         L = np.max(eigenvalues)
-        opt_lr = 1 / L
+        opt_lr = np.float64(1 / L)
         if verbose:
             print("Optimal beta: ", true_beta, " Optimal lr: ", opt_lr)
-        if type(lr) != str:  # this way i can try it with exact line search
-            lr = opt_lr
+        lr = opt_lr
+
+    if verbose:
+        print("Training model using Nesterov accelerated gradient descent...")
 
     start_time = time.process_time()
 
@@ -145,8 +156,14 @@ def nag(
             sched = (1 + np.sqrt(1 + 4 * (sched**2))) / 2
             true_beta = (prec_sched - 1) / sched
 
+        if verbose:
+            print("computing momentum")
+
         # compute momentum
         v = true_beta * v - stepsize * update_grad
+
+        if verbose:
+            print(type(v))
 
         # update the weights
         model.output_weights += v
