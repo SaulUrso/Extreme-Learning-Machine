@@ -43,31 +43,31 @@ def solve_system(M, B):
     return W
 
 
-# if __name__ == "__main__":
-#     n = 4
-#     total_error = 0
-#     for i in range(1000):
-#         A = np.random.rand(n, n)
-#         M = np.matmul(A, A.T)
-#         B = np.random.rand(n, 1)
+if __name__ == "__main__":
+    n = 4
+    total_error = 0
+    for i in range(1000):
+        A = np.random.rand(n, n)
+        M = np.matmul(A, A.T)
+        B = np.random.rand(n, 1)
 
-#         W = solve_system(M, B)
-#         X = np.linalg.solve(M, B)
+        W = solve_system(M, B)
+        X = np.linalg.solve(M, B)
 
-#         error = np.linalg.norm(W-X)
+        error = np.linalg.norm(W-X)
 
-#         if error > 1:
-#             print("Error:")
-#             print(error)
-#             print("M:")
-#             print(M)
-#             print("B:")
-#             print(B)
-#             print("W:")
-#             print(W)
-#             print("X:")
-#             print(X)
+        if error > 1:
+            print("Error:")
+            print(error)
+            print("M:")
+            print(M)
+            print("B:")
+            print(B)
+            print("W:")
+            print(W)
+            print("X:")
+            print(X)
 
-#         total_error += error
-#     print("Total Error:")
-#     print(total_error)
+        total_error += error
+    print("Total Error:")
+    print(total_error)

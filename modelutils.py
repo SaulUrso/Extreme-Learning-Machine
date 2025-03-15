@@ -137,6 +137,13 @@ class ELM:
         # Solve for output weights
         self.output_weights = np.linalg.solve(RtR, RtY)
 
+    def computewoutsystem(self, X, Y, alpha=0):
+        A = self.hidden_activations(X)
+        M = np.matmul(A.T, A) + alpha * np.eye(self.hidden_size)
+        B = np.matmul(A.T, Y)
+
+        self.output_weights = solve_system(M, B)
+
 
 def compute_loss(y_true, y_pred, alpha=0):
     """
