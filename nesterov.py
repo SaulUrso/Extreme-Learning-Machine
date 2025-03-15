@@ -76,9 +76,13 @@ def nag(
 
     # guarantee posdef in case of numerical errors (happens for large hidden sizes)
     # NOTE: investigate what gradient descent does, however alpha propably guarantees always posdef
-    eig_min = np.min(np.linalg.eigvals(AtA))
+    eig_min = np.min(np.linalg.eigvalsh(AtA))
     old_tau = max(0, -eig_min)
     BtB = AtA + (old_tau + alpha) * np.eye(model.hidden_size)
+
+    # check BtB is float64
+    if BtB.dtype != np.float64:
+        raise ValueError("BtB must be of type np.float64")
 
     BtY = A.T @ Y
 
@@ -94,7 +98,9 @@ def nag(
         L = np.max(eigenvalues)
         tau = np.min(eigenvalues)
 
-        true_beta = (np.sqrt(L) - np.sqrt(tau)) / (np.sqrt(L) + np.sqrt(tau))
+        true_beta = np.float64(
+            (np.sqrt(L) - np.sqrt(tau)) / (np.sqrt(L) + np.sqrt(tau))
+        )
         if verbose:
             print(true_beta)
     else:
@@ -139,6 +145,9 @@ def nag(
             BtB=BtB,
             BtY=BtY,
         )
+
+        if not update_grad.dtype == np.float64:
+            raise ValueError("update_grad must be of type np.float64")
 
         if lr == "auto":  # exact line search
             stepsize = np.linalg.norm(update_grad, "fro") ** 2 / (
