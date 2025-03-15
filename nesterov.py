@@ -2,25 +2,26 @@
 
 import numpy as np
 import modelutils as mu
+import time
 
 
 def nag(
     model: mu.ELM,
     X,
     Y,
-    X_val,
-    Y_val,
-    lr="auto",
+    lr="auto",  # the stepsize
     alpha=np.float64(0),
     beta="schedule",
     max_epochs=1000,
-    eps=np.float64(1e-6),
-    verbose=False,
-    check_float64=False,
-    fast_mode=False,
+    eps=np.float64(1e-6),  # stopping criterion for gradient norm
+    prec_error=0,  # never used, adds small number to denominator for zero division
+    exact_solution=None,
+    verbose=False,  # used for debugging
+    check_float64=False,  # used for debugging
+    fast_mode=False,  # used when computing execution time
 ):
     """
-    Perform Nesterov accelerated gradient descent.
+    Perform Nesterov accelerated gradient descent with exact line search for quadratic functions.
 
     Parameters:
     - model: ELM object, the model to be trained
@@ -40,11 +41,7 @@ def nag(
 
     if check_float64:
         if X.dtype != np.float64 or Y.dtype != np.float64:
-            raise ValueError("X and Y must be of type np.float")
-
-    if check_float64:
-        if X_val.dtype != np.float64 or Y_val.dtype != np.float64:
-            raise ValueError("X_val and Y_val must be of type np.float")
+            raise ValueError("X and Y must be of type np.float64")
 
     if check_float64:
         if (
@@ -52,7 +49,7 @@ def nag(
             or model.b_in.dtype != np.float64
             or model.output_weights.dtype != np.float64
         ):
-            raise ValueError("Model weights must be of type np.float")
+            raise ValueError("Model weights must be of type np.float64")
 
     # check if parameters are of the correct type
     if check_float64:
@@ -69,19 +66,17 @@ def nag(
         print("Training model using Nesterov accelerated gradient descent...")
 
     loss_train_history = []
-    loss_val_history = []
+    sol_dist_history = []
+    grad_history = []
 
     # initialize the velocity
     v = np.zeros_like(model.output_weights)
 
-    # compute BtB and BtY, which are fixes throughout the training
+    # compute BtB and BtY, which are fixed throughout the training
     A = model.hidden_activations(X)
 
     BtB = A.T @ A + alpha * np.eye(model.hidden_size)
     BtY = A.T @ Y
-
-    # compute hidden activation for validation set
-    A_val = model.hidden_activations(X_val)
 
     # check if there is a problem with the model
     has_problem = False
@@ -89,18 +84,36 @@ def nag(
     if beta == "schedule":
         sched = 1
         true_beta = 0
+    elif beta == "optimal":
+        eigenvalues = np.linalg.eigvals(BtB)
+        L = np.max(eigenvalues)
+        tau = np.min(eigenvalues)
+        true_beta = (np.sqrt(L) - np.sqrt(tau)) / (np.sqrt(L) + np.sqrt(tau))
     else:
         true_beta = beta
+
+    if lr == "optimal":
+        eigenvalues = np.linalg.eigvals(BtB)
+        L = np.max(eigenvalues)
+        opt_lr = 1 / L
+        if verbose:
+            print("Optimal beta: ", true_beta, " Optimal lr: ", opt_lr)
+        if type(lr) != str:  # this way i can try it with exact line search
+            lr = opt_lr
+
+    start_time = time.process_time()
 
     for epoch in range(max_epochs):
 
         # compute the true gradient
         true_grad = model.compute_gradient(BtB=BtB, BtY=BtY)
+        true_grad_norm = np.linalg.norm(true_grad, "fro")
+        grad_history.append(true_grad_norm)
 
         # check for convergence
-        if np.linalg.norm(true_grad, "fro") < eps:
+        if true_grad_norm < eps:
             if verbose:
-                print(f"Converged at epoch for true grad {epoch + 1}")
+                print(f"Converged at epoch {epoch + 1}")
             break
 
         # happens when gradient explodes
@@ -118,22 +131,18 @@ def nag(
 
         if lr == "auto":  # exact line search
             stepsize = np.linalg.norm(update_grad, "fro") ** 2 / (
-                np.trace(update_grad.T @ BtB @ update_grad) + 1e-8
+                np.trace(update_grad.T @ BtB @ update_grad) + prec_error
             )
         elif lr == "col":  # exact line search on all columns
-            # obtain 2-norm squared for each column
             col_norms = np.einsum("ij,ji->i", update_grad.T, update_grad)
             col_BtB_norms = np.diag(update_grad.T @ BtB @ update_grad)
-            # col_BtB_norms = np.einsum(
-            #    "ij,ji->i", update_grad.T, BtB @ update_grad
-            # )
-            stepsize = col_norms / (col_BtB_norms + 1e-8)
+            stepsize = col_norms / (col_BtB_norms + prec_error)
         else:
             stepsize = lr
 
         if beta == "schedule":
             prec_sched = sched
-            sched = (1 + np.sqrt(1 + 4 * sched**2)) / 2
+            sched = (1 + np.sqrt(1 + 4 * (sched**2))) / 2
             true_beta = (prec_sched - 1) / sched
 
         # compute momentum
@@ -142,39 +151,50 @@ def nag(
         # update the weights
         model.output_weights += v
 
-        if fast_mode:
+        if fast_mode:  # skipping computation of loss for faster execution
             continue
+
+        # compute distance from exact solution if not none
+        if exact_solution is not None:
+            sol_dist = np.linalg.norm(model.output_weights - exact_solution, "fro")
+            sol_dist_history.append(sol_dist)
 
         # compute the loss
         loss_train = mu.compute_loss(Y, model.predict(A=A), alpha)
-        loss_val = mu.compute_loss(Y_val, model.predict(A=A_val), alpha)
 
         if check_float64:
-            if (
-                not loss_train.dtype == np.float64
-                or not loss_val.dtype == np.float64
-            ):
-                raise ValueError("Losses must be of type np.float64")
+            if not loss_train.dtype == np.float64:
+                raise ValueError("Loss must be of type np.float64")
 
         # happens when loss explodes
-        if np.isnan(loss_train) or np.isnan(loss_val):
+        if np.isnan(loss_train):
             has_problem = True
             print("Warning: NaN loss encountered")
             break
 
         # save the loss history
         loss_train_history.append(loss_train)
-        loss_val_history.append(loss_val)
 
         if verbose:
             print(
-                f"Epoch {epoch + 1}: \t train loss = {loss_train:.8f}, \t val loss = {loss_val:.8f}, \tgrad norm = {np.linalg.norm(true_grad, 'fro'):.8f}"  # noqa
+                f"Epoch {epoch + 1}: \t train loss = {loss_train:.8f}, \tgrad norm = {np.linalg.norm(true_grad, 'fro'):.8f}"
             )
 
-    if fast_mode:
-        loss_train = mu.compute_loss(Y, model.predict(A=A), alpha)
-        loss_val = mu.compute_loss(Y_val, model.predict(A=A_val), alpha)
-        loss_train_history.append(loss_train)
-        loss_val_history.append(loss_val)
+    end_time = time.process_time()
 
-    return model, loss_train_history, loss_val_history, epoch + 1, has_problem
+    if fast_mode:  # need to compute the final values since they were never  computed
+        loss_train = mu.compute_loss(Y, model.predict(A=A), alpha)
+        loss_train_history.append(loss_train)
+        if exact_solution is not None:
+            sol_dist = np.linalg.norm(model.output_weights - exact_solution, "fro")
+            sol_dist_history.append(sol_dist)
+
+    return (
+        model,
+        loss_train_history,
+        sol_dist_history,
+        grad_history,
+        epoch + 1,
+        end_time - start_time,
+        has_problem,
+    )
