@@ -1,4 +1,7 @@
+import time
+
 import numpy as np
+
 from cholensky import cholensky
 
 
@@ -28,19 +31,21 @@ def back_substitution(U, B):
     X = np.zeros_like(B, dtype=np.double)
 
     for k in range(m):
-        for i in range(n-1, -1, -1):
+        for i in range(n - 1, -1, -1):
             sum = 0
-            for j in range(i+1, n):
+            for j in range(i + 1, n):
                 sum += U[i, j] * X[j, k]
             X[i, k] = (B[i, k] - sum) / U[i, i]
     return X
 
 
 def solve_system(M, B):
+    start = time.process_time()
     L, U = cholensky(M)
+    end = time.process_time()
     Z = forward_substitution(L, B)
     W = back_substitution(U, Z)
-    return W
+    return W, end - start
 
 
 if __name__ == "__main__":
@@ -54,7 +59,7 @@ if __name__ == "__main__":
         W = solve_system(M, B)
         X = np.linalg.solve(M, B)
 
-        error = np.linalg.norm(W-X)
+        error = np.linalg.norm(W - X)
 
         if error > 1:
             print("Error:")

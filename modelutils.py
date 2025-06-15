@@ -1,6 +1,7 @@
 # the model, a 1 layer extreme learning machine
 
 import numpy as np
+
 from backfwd import solve_system
 
 
@@ -139,10 +140,13 @@ class ELM:
 
     def computewoutsystem(self, X, Y, alpha=0):
         A = self.hidden_activations(X)
-        M = np.matmul(A.T, A) + alpha * np.eye(self.hidden_size)
-        B = np.matmul(A.T, Y)
+        AtA = A.T @ A
+        BtB = AtA + alpha * np.eye(self.hidden_size)
+        # cond=np.linalg.cond(M)
+        Aty = np.matmul(A.T, Y)
+        self.output_weights, execution_time_chol = solve_system(BtB, Aty)
 
-        self.output_weights = solve_system(M, B)
+        return execution_time_chol
 
 
 def compute_loss(y_true, y_pred, alpha=0):

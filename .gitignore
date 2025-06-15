@@ -3,6 +3,9 @@
 Results/*
 Plots/*
 FullRuns/*
+FullRuns*
+Results*
+magic*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
