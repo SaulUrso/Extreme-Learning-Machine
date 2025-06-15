@@ -1,5 +1,11 @@
 # MLProj19Cm2324
 
+## Code of the algorithms
+
+- `nesterov.py`: Implementation of the Nesterov Accelerated Gradient algorithm.
+- `modelutils.py`: Contains the code for the Extreme Learning Machine (ELM) model.
+- `cholesky.py` and `backfwd.py`: Provide the code for solving the closed-form solution using Cholesky decomposition and forward/backward substitution.
+
 
 ## Setting Up the Python Environment
 
@@ -26,3 +32,14 @@ To create and use a virtual environment:
     ```bash
     pip install -r requirements.txt
     ```
+
+## Experiments 
+
+With the environment activated, you can use Jupyter to run the notebooks `nesterov.ipynb` and `cholesky.ipynb`:
+
+```bash
+pip install jupyter
+jupyter notebook
+```
+
+Then, open the notebooks in your browser and execute the cells as needed.

@@ -1,4 +1,4 @@
-# implementation of Nesterov accelerated gradient descent
+# Implementation of Nesterov Accelerated Gradient Descent for ELM models
 
 import time
 
@@ -11,36 +11,45 @@ def nag(
     model: mu.ELM,
     X,
     Y,
-    lr="auto",  # the stepsize
-    alpha=np.float64(0),
-    beta="schedule",
-    max_epochs=1000,
-    eps=np.float64(1e-6),  # stopping criterion for gradient norm
-    prec_error=0,  # never used, adds small number to denominator for zero division
-    exact_solution=None,
-    verbose=False,  # used for debugging
-    check_float64=False,  # used for debugging
-    fast_mode=False,  # used when computing execution time
-    precision=np.float64,  # added precision parameter
+    lr="auto", 
+    alpha=np.float64(0),  
+    beta="schedule", 
+    max_epochs=1000, 
+    eps=np.float64(1e-6),  
+    prec_error=0,  
+    exact_solution=None,  
+    verbose=False,  # print debug/training info
+    check_float64=False,  # check for correct dtype, it is called this way because initially we did not change the precision
+    fast_mode=False,  # skip loss computation for speed
+    precision=np.float64,  
 ):
     """
-    Perform Nesterov accelerated gradient descent with exact line search for quadratic functions.
+    Perform Nesterov Accelerated Gradient Descent (NAG) to train an ELM model.
 
     Parameters:
-    - model: ELM object, the model to be trained
-    - X: numpy matrix, features
-    - Y: numpy matrix, targets
-    - lr: float, learning rate (default: 0.01)
-    - alpha: float, regularization parameter (default: 0)
-    - beta: float, momentum parameter (default: 0)
-    - max_epochs: int, maximum number of epochs (default: 1000)
-    - eps: float, convergence threshold (default: 1e-6)
-    - verbose: bool, whether to print training information (default: False)
-    - precision: numpy dtype, precision for computations (default: np.float64)
+        model (mu.ELM): The ELM model to be trained.
+        X (np.ndarray): Input features.
+        Y (np.ndarray): Target outputs.
+        lr (float or str): Learning rate, 'optimal' for optimal stepsize according to NAG,  or 'auto'/'col' for line search (default: 'auto').
+        alpha (float): Regularization parameter (default: 0).
+        beta (float or str): Momentum parameter, 'schedule', or 'optimal' (default: 'schedule').
+        max_epochs (int): Maximum number of epochs (default: 1000).
+        eps (float): Convergence threshold for gradient norm (default: 1e-6).
+        prec_error (float): Small value to avoid division by zero (default: 0).
+        exact_solution (np.ndarray, optional): Known solution for monitoring convergence (default: None).
+        verbose (bool): Whether to print training progress (default: False).
+        check_float64 (bool): Whether to check for correct dtype (default: False).
+        fast_mode (bool): If True, skips loss computation for speed (default: False).
+        precision (np.dtype): Numpy dtype for computation precision (default: np.float64).
 
     Returns:
-    - model: ELM object, the trained model
-    - loss_history: list, history of loss values
+        model (mu.ELM): The trained model.
+        loss_train_history (list): Training loss at each epoch.
+        sol_dist_history (list): Distance to exact solution at each epoch (if provided).
+        grad_history (list): Gradient norm at each epoch.
+        epoch (int): Number of epochs performed.
+        elapsed_time (float): Total training time in seconds.
+        has_problem (bool): True if NaN encountered in gradient or loss.
     """
 
     # Cast X, Y, alpha, eps, etc. to the desired precision
@@ -49,14 +58,17 @@ def nag(
     alpha = precision(alpha)
     eps = precision(eps)
     prec_error = precision(prec_error)
+
     # If exact_solution is provided, cast it as well
     if exact_solution is not None:
         exact_solution = exact_solution.astype(precision, copy=False)
 
+    # Check input dtypes if requested
     if check_float64:
         if X.dtype != precision or Y.dtype != precision:
             raise ValueError(f"X and Y must be of type {precision}")
 
+    # Check model weights dtypes if requested
     if check_float64:
         if (
             model.input_weights.dtype != precision
@@ -73,7 +85,7 @@ def nag(
             ):
                 raise ValueError(f"Model weights must be of type {precision}")
 
-    # check if parameters are of the correct type
+    # Check parameter types if requested
     if check_float64:
         if (
             not alpha.dtype == precision
@@ -84,44 +96,39 @@ def nag(
                 f"lr, alpha, beta, max_epochs and eps must be of type {precision} and int"
             )
 
+    # Initialize histories for tracking progress
     loss_train_history = []
     sol_dist_history = []
     grad_history = []
 
-    # For stationary gradient check using moving window means
-    # stationary_patience = 1000  # Number of epochs in each window
-    # stationary_tol = 1e-3  # Relative tolerance for mean gradient change
-    # grad_window = []
-
-    # initialize the velocity
+    # Initialize the velocity (momentum term)
     v = np.zeros_like(model.output_weights, dtype=precision)
 
-    # compute BtB and BtY, which are fixed throughout the training
+    # Precompute hidden layer activations and related matrices
     A = model.hidden_activations(X).astype(precision, copy=False)
-
-    AtA = A.T @ A  # + alpha * np.eye(model.hidden_size)
+    AtA = A.T @ A
     AtA = AtA.astype(precision, copy=False)
 
-    # guarantee posdef in case of numerical errors (happens for large hidden sizes)
-    # NOTE: investigate what gradient descent does, however alpha propably guarantees always posdef
+    # Guarantee positive definiteness for numerical stability
     eig_min = np.min(np.linalg.eigvalsh(AtA))
     old_tau = max(precision(0), -eig_min)
-    BtB = AtA + (alpha) * np.eye(model.hidden_size, dtype=precision)  # + old_tau
+    BtB = AtA + (alpha) * np.eye(model.hidden_size, dtype=precision)
     print(
         old_tau
     )  # sometimes is negative, but a factor of -13, meaning that alpha should make it positive
 
-    # check BtB is correct precision
+    # Check BtB dtype
     if BtB.dtype != precision:
         raise ValueError(f"BtB must be of type {precision}")
 
     BtY = A.T @ Y
     BtY = BtY.astype(precision, copy=False)
 
-    # check if there is a problem with the model
+    # Track if any numerical problems occur
     has_problem = False
     eigenvalues = None
 
+    # Determine momentum parameter beta
     if beta == "schedule":
         sched = precision(1)
         true_beta = precision(0)
@@ -129,15 +136,14 @@ def nag(
         eigenvalues = np.linalg.eigvalsh(BtB)
         L = np.max(eigenvalues)
         tau = np.min(eigenvalues)
-
         true_beta = precision((np.sqrt(L) - np.sqrt(tau)) / (np.sqrt(L) + np.sqrt(tau)))
-
         print(f"Optimal Beta: {true_beta}")
     else:
         true_beta = (
             precision(beta) if isinstance(beta, (float, int, np.floating)) else beta
         )
 
+    # Determine learning rate
     if lr == "optimal":
         if eigenvalues is None:
             eigenvalues = np.linalg.eigvalsh(BtB)
@@ -153,40 +159,25 @@ def nag(
 
     for epoch in range(max_epochs):
 
-        # compute the true gradient
+        # Compute the true gradient at current weights
         true_grad = model.compute_gradient(BtB=BtB, BtY=BtY)
         true_grad = true_grad.astype(precision, copy=False)
         true_grad_norm = np.linalg.norm(true_grad, "fro")
         grad_history.append(true_grad_norm)
 
-        # check for convergence
+        # Check for convergence
         if true_grad_norm <= eps:
             if verbose:
                 print(f"Converged at epoch {epoch + 1}")
             break
 
-        # # Track gradient norms in a moving window for stationarity
-        # grad_window.append(true_grad_norm)
-        # if len(grad_window) > 2 * stationary_patience:
-        #     grad_window.pop(0)
-        # if len(grad_window) == 2 * stationary_patience:
-        #     mean1 = np.mean(grad_window[:stationary_patience])
-        #     mean2 = np.mean(grad_window[stationary_patience:])
-        #     rel_change = abs(mean2 - mean1) / (abs(mean1) + 1e-14)
-        #     if rel_change < stationary_tol:
-        #         if verbose:
-        #             print(
-        #                 f"Stopped at epoch {epoch + 1} due to stationary gradient (mean grad change {rel_change:.2e} < tol {stationary_tol}) over {2*stationary_patience} epochs"
-        #             )
-        #         break
-
-        # happens when gradient explodes
+        # Check for NaN in gradient (exploding/unstable)
         if np.isnan(true_grad).any():
             has_problem = True
             print("Warning: NaN gradient encountered")
             break
 
-        # compute the update gradient
+        # Compute the gradient at the lookahead position (Nesterov update)
         update_grad = model.compute_gradient(
             W_out=model.output_weights + true_beta * v,
             BtB=BtB,
@@ -197,6 +188,7 @@ def nag(
         if not update_grad.dtype == precision:
             raise ValueError(f"update_grad must be of type {precision}")
 
+        # Compute stepsize (learning rate)
         if lr == "auto":  # exact line search
             stepsize = np.linalg.norm(update_grad, "fro") ** 2 / (
                 np.trace(update_grad.T @ BtB @ update_grad) + prec_error
@@ -210,6 +202,7 @@ def nag(
         else:
             stepsize = precision(lr)
 
+        # Update momentum parameter if using schedule
         if beta == "schedule":
             prec_sched = sched
             sched = (
@@ -220,25 +213,24 @@ def nag(
         if verbose:
             print("computing momentum")
 
-        # compute momentum
+        # Update velocity (momentum)
         v = true_beta * v - stepsize * update_grad
-        # v_history.append(np.median(np.abs(v)))
 
         if verbose:
             print(type(v))
 
-        # update the weights
+        # Update model weights
         model.output_weights += v
 
         if fast_mode:  # skipping computation of loss for faster execution
             continue
 
-        # compute distance from exact solution if not none
+        # Compute distance from exact solution if provided
         if exact_solution is not None:
             sol_dist = np.linalg.norm(model.output_weights - exact_solution, "fro")
             sol_dist_history.append(sol_dist)
 
-        # compute the loss
+        # Compute the loss
         loss_train = mu.compute_loss(Y, model.predict(A=A), alpha)
         if hasattr(loss_train, "astype"):
             loss_train = loss_train.astype(precision, copy=False)
@@ -247,13 +239,13 @@ def nag(
             if not loss_train.dtype == precision:
                 raise ValueError(f"Loss must be of type {precision}")
 
-        # happens when loss explodes
+        # Check for NaN in loss (exploding/unstable)
         if np.isnan(loss_train):
             has_problem = True
             print("Warning: NaN loss encountered")
             break
 
-        # save the loss history
+        # Save loss history
         loss_train_history.append(loss_train)
 
         if verbose:
@@ -263,7 +255,8 @@ def nag(
 
     end_time = time.process_time()
 
-    if fast_mode:  # need to compute the final values since they were never  computed
+    # If fast_mode, compute final loss and solution distance
+    if fast_mode:
         loss_train = mu.compute_loss(Y, model.predict(A=A), alpha)
         if hasattr(loss_train, "astype"):
             loss_train = loss_train.astype(precision, copy=False)
@@ -277,7 +270,6 @@ def nag(
         loss_train_history,
         sol_dist_history,
         grad_history,
-        # v_history,
         epoch + 1,
         end_time - start_time,
         has_problem,

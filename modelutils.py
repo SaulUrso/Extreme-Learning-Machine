@@ -1,4 +1,11 @@
-# the model, a 1 layer extreme learning machine
+"""
+modelutils.py
+
+Implements a single-layer Extreme Learning Machine (ELM) model and utility functions for training,
+prediction, and evaluation. Includes various methods for solving the output weights using different
+linear algebra techniques and regularization. Also provides functions for computing loss and variance.
+
+"""
 
 import numpy as np
 
@@ -6,8 +13,29 @@ from backfwd import solve_system
 
 
 class ELM:
+    """
+    Extreme Learning Machine (ELM) with a single hidden layer.
+
+    Attributes:
+        input_size (int): Number of input features.
+        hidden_size (int): Number of hidden neurons.
+        output_size (int): Number of output neurons.
+        input_weights (ndarray): Weights from input to hidden layer.
+        b_in (ndarray): Bias for hidden layer. (not used)
+        output_weights (ndarray): Weights from hidden to output layer.
+    """
 
     def __init__(self, input_size, hidden_size, output_size=3, seed=0, init="fan-in"):
+        """
+        Initialize the ELM model with random weights.
+
+        Args:
+            input_size (int): Number of input features.
+            hidden_size (int): Number of hidden neurons.
+            output_size (int): Number of output neurons (default: 3).
+            seed (int): Random seed for reproducibility (default: 0).
+            init (str): Initialization method ("fan-in" or "std").
+        """
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
@@ -42,9 +70,28 @@ class ELM:
         ), "Output weights matrix has incorrect dimensions."
 
     def tanh(self, x):
+        """
+        Hyperbolic tangent activation function.
+
+        Args:
+            x (ndarray): Input array.
+
+        Returns:
+            ndarray: Activated output.
+        """
         return np.tanh(x)
 
     def predict(self, x=None, A=None):
+        """
+        Predict output for given input data or hidden activations.
+
+        Args:
+            x (ndarray, optional): Input data.
+            A (ndarray, optional): Precomputed hidden activations.
+
+        Returns:
+            ndarray: Predicted output.
+        """
         if A is None:
             if x is None:
                 raise ValueError("x must be provided.")
@@ -52,9 +99,35 @@ class ELM:
         return A.dot(self.output_weights)
 
     def hidden_activations(self, x):
+        """
+        Compute hidden layer activations for input data.
+
+        Args:
+            x (ndarray): Input data.
+
+        Returns:
+            ndarray: Hidden activations.
+        """
         return self.tanh(x.dot(self.input_weights))  # + self.b_in)
 
     def compute_gradient(self, X=None, Y=None, alpha=0, W_out=None, BtB=None, BtY=None):
+        """
+        Compute the gradient of the loss with respect to the output weights.
+
+        Args:
+            X (ndarray, optional): Input data.
+            Y (ndarray, optional): Target output.
+            alpha (float, optional): Regularization parameter.
+            W_out (ndarray, optional): Output weight matrix.
+            BtB (ndarray, optional): Precomputed A^T @ A + alpha * I.
+            BtY (ndarray, optional): Precomputed A^T @ Y.
+
+        Returns:
+            ndarray: Computed gradient.
+
+        Raises:
+            ValueError: If X and Y are not provided when needed.
+        """
         """
         Compute the gradient of the model's output with respect to the weights.
 
@@ -96,20 +169,31 @@ class ELM:
             grad = BtB @ self.output_weights - BtY
         return grad
 
-    def compute_wout_system(self, X, Y, alpha=0):
-
-        A = self.hidden_activations(X)
-        M = np.matmul(A.T, A) + alpha * np.eye(self.hidden_size)
-        B = np.matmul(A.T, Y)
-        self.output_weights = solve_system(M, B)
-
     def condition_number_m(self, X, alpha=0):
+        """
+        Compute the condition number of the regularized hidden activation matrix.
+
+        Args:
+            X (ndarray): Input data.
+            alpha (float, optional): Regularization parameter.
+
+        Returns:
+            float: Condition number.
+        """
         A = self.hidden_activations(X)
         M = np.matmul(A.T, A) + alpha * np.eye(self.hidden_size)
         condition_number = np.linalg.cond(M, 2)
         return condition_number
 
     def compute_wout_system_np(self, X, Y, alpha=0):
+        """
+        Compute output weights using NumPy's linear solver.
+
+        Args:
+            X (ndarray): Input data.
+            Y (ndarray): Target output.
+            alpha (float, optional): Regularization parameter.
+        """
         A = self.hidden_activations(X)
         M = np.matmul(A.T, A) + alpha * np.eye(self.hidden_size)
 
@@ -118,12 +202,12 @@ class ELM:
 
     def compute_wout_system_qr(self, X, Y, alpha=0):
         """
-        Compute the output weights using QR decomposition with L2 regularization.
+        Compute output weights using QR decomposition with L2 regularization.
 
         Args:
-            X (ndarray): Input data (N x d)
-            Y (ndarray): Target output (N x M)
-            alpha (float): L2 regularization parameter
+            X (ndarray): Input data (N x d).
+            Y (ndarray): Target output (N x M).
+            alpha (float): L2 regularization parameter.
 
         Updates:
             self.output_weights (hidden_size x output_size)
@@ -138,7 +222,18 @@ class ELM:
         # Solve for output weights
         self.output_weights = np.linalg.solve(RtR, RtY)
 
-    def computewoutsystem(self, X, Y, alpha=0):
+    def compute_wout_system(self, X, Y, alpha=0):
+        """
+        Compute output weights using a custom system solver and return execution time.
+
+        Args:
+            X (ndarray): Input data.
+            Y (ndarray): Target output.
+            alpha (float, optional): Regularization parameter.
+
+        Returns:
+            float: Execution time of the solver.
+        """
         A = self.hidden_activations(X)
         AtA = A.T @ A
         BtB = AtA + alpha * np.eye(self.hidden_size)
@@ -150,6 +245,17 @@ class ELM:
 
 
 def compute_loss(y_true, y_pred, alpha=0):
+    """
+    Compute the regularized mean squared error loss.
+
+    Parameters:
+        y_true (ndarray): True labels.
+        y_pred (ndarray): Predicted labels.
+        alpha (float, optional): Regularization parameter.
+
+    Returns:
+        float: Computed loss value.
+    """
     """
     Compute the loss between the true labels and predicted labels.
 
@@ -168,6 +274,16 @@ def compute_loss(y_true, y_pred, alpha=0):
 
 
 def compute_variance(y_true, y_pred):
+    """
+    Compute the variance of the prediction error.
+
+    Parameters:
+        y_true (ndarray): True labels.
+        y_pred (ndarray): Predicted labels.
+
+    Returns:
+        float: Computed variance value.
+    """
     """
     Compute the variance between the true labels and predicted labels.
 
