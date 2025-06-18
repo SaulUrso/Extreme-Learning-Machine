@@ -3,7 +3,7 @@ import numpy as np
 
 def cholensky(A):
     A = np.array(A)
-    # noqa TODO: i controlli quando facciamo le prove semmai li mettiamo fuori dall' algoritmo, altrimenti sprechi troppo tempo
+    # noqa
     # if not np.all(np.linalg.eigvals(A) > 0):
     #    raise ValueError("Matrix is not positive definite")
     # if not (A == A.T).all():
@@ -19,27 +19,25 @@ def cholensky(A):
     return L, L.T
 
 
-# Now we wrote a symmetric matrix A, and we want to find the Cholesky decomposition of A
 
+# if __name__ == "__main__":
+#     total_error = 0
+#     for i in range(1000):
+#         n = 4
+#         A = np.random.rand(n, n)
+#         M = np.matmul(A, A.T)
+#         L, U = cholensky(M)
 
-if __name__ == "__main__":
-    total_error = 0
-    for i in range(1000):
-        n = 4
-        A = np.random.rand(n, n)
-        M = np.matmul(A, A.T)
-        L, U = cholensky(M)
+#         """print("M:")
+#         print(M)
+#         print("Cholesky decomposition of M:")
+#         print(L)
+#         print(U)
+#         print("A:")
+#         print(np.matmul(L, U))"""
 
-        """print("M:")
-        print(M)
-        print("Cholesky decomposition of M:")
-        print(L)
-        print(U)
-        print("A:")
-        print(np.matmul(L, U))"""
+#         error = np.linalg.norm(M - np.matmul(L, U))
+#         total_error += error
 
-        error = np.linalg.norm(M - np.matmul(L, U))
-        total_error += error
-
-    print("Total Error:")
-    print(total_error)
+#     print("Total Error:")
+#     print(total_error)

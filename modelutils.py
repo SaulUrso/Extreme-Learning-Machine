@@ -3,7 +3,7 @@ modelutils.py
 
 Implements a single-layer Extreme Learning Machine (ELM) model and utility functions for training,
 prediction, and evaluation. Includes various methods for solving the output weights using different
-linear algebra techniques and regularization. Also provides functions for computing loss and variance.
+linear algebra techniques and regularization. Also provides functions for computing loss.
 
 """
 
@@ -112,24 +112,8 @@ class ELM:
 
     def compute_gradient(self, X=None, Y=None, alpha=0, W_out=None, BtB=None, BtY=None):
         """
-        Compute the gradient of the loss with respect to the output weights.
-
-        Args:
-            X (ndarray, optional): Input data.
-            Y (ndarray, optional): Target output.
-            alpha (float, optional): Regularization parameter.
-            W_out (ndarray, optional): Output weight matrix.
-            BtB (ndarray, optional): Precomputed A^T @ A + alpha * I.
-            BtY (ndarray, optional): Precomputed A^T @ Y.
-
-        Returns:
-            ndarray: Computed gradient.
-
-        Raises:
-            ValueError: If X and Y are not provided when needed.
-        """
-        """
-        Compute the gradient of the model's output with respect to the weights.
+        Compute the gradient of the model's output with respect to the weights. You either need to provide the dataset
+        or the already computed matrices needed for gradient calculation
 
         Args:
             X (ndarray, optional): Input data matrix. Defaults to None.
@@ -244,24 +228,14 @@ class ELM:
         return execution_time_chol
 
 
-def compute_loss(y_true, y_pred, alpha=0):
-    """
-    Compute the regularized mean squared error loss.
-
-    Parameters:
-        y_true (ndarray): True labels.
-        y_pred (ndarray): Predicted labels.
-        alpha (float, optional): Regularization parameter.
-
-    Returns:
-        float: Computed loss value.
-    """
+def compute_loss(y_true, y_pred, w_out, alpha=0):  # TODO: change to correct one
     """
     Compute the loss between the true labels and predicted labels.
 
     Parameters:
     - y_true: numpy array, true labels
     - y_pred: numpy array, predicted labels
+    - w_out: parameters to regularize
     - alpha: float, regularization parameter (default: 0)
 
     Returns:
@@ -269,7 +243,7 @@ def compute_loss(y_true, y_pred, alpha=0):
     """
     return (
         np.linalg.norm(y_true - y_pred, "fro") ** 2
-        + alpha * np.linalg.norm(y_pred, "fro") ** 2
+        + alpha * np.linalg.norm(w_out, "fro") ** 2
     ) / y_true.shape[0]
 
 
@@ -283,15 +257,5 @@ def compute_variance(y_true, y_pred):
 
     Returns:
         float: Computed variance value.
-    """
-    """
-    Compute the variance between the true labels and predicted labels.
-
-    Parameters:
-    - y_true: numpy array, true labels
-    - y_pred: numpy array, predicted labels
-
-    Returns:
-    - variance: float, computed variance value
     """
     return np.var(y_true - y_pred)

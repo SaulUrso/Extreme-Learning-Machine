@@ -11,17 +11,17 @@ def nag(
     model: mu.ELM,
     X,
     Y,
-    lr="auto", 
-    alpha=np.float64(0),  
-    beta="schedule", 
-    max_epochs=1000, 
-    eps=np.float64(1e-6),  
-    prec_error=0,  
-    exact_solution=None,  
+    lr="auto",
+    alpha=np.float64(0),
+    beta="schedule",
+    max_epochs=1000,
+    eps=np.float64(1e-6),
+    prec_error=0, # never used in any of the experiments shown
+    exact_solution=None,
     verbose=False,  # print debug/training info
     check_float64=False,  # check for correct dtype, it is called this way because initially we did not change the precision
     fast_mode=False,  # skip loss computation for speed
-    precision=np.float64,  
+    precision=np.float64, 
 ):
     """
     Perform Nesterov Accelerated Gradient Descent (NAG) to train an ELM model.
@@ -30,7 +30,7 @@ def nag(
         model (mu.ELM): The ELM model to be trained.
         X (np.ndarray): Input features.
         Y (np.ndarray): Target outputs.
-        lr (float or str): Learning rate, 'optimal' for optimal stepsize according to NAG,  or 'auto'/'col' for line search (default: 'auto').
+        lr (float or str): Learning rate/stepsize, 'optimal' for optimal stepsize according to NAG,  or 'auto'/'col' for line search (default: 'auto').
         alpha (float): Regularization parameter (default: 0).
         beta (float or str): Momentum parameter, 'schedule', or 'optimal' (default: 'schedule').
         max_epochs (int): Maximum number of epochs (default: 1000).
@@ -231,7 +231,7 @@ def nag(
             sol_dist_history.append(sol_dist)
 
         # Compute the loss
-        loss_train = mu.compute_loss(Y, model.predict(A=A), alpha)
+        loss_train = mu.compute_loss(Y, model.predict(A=A), model.output_weights, alpha)
         if hasattr(loss_train, "astype"):
             loss_train = loss_train.astype(precision, copy=False)
 
@@ -257,7 +257,7 @@ def nag(
 
     # If fast_mode, compute final loss and solution distance
     if fast_mode:
-        loss_train = mu.compute_loss(Y, model.predict(A=A), alpha)
+        loss_train = mu.compute_loss(Y, model.predict(A=A), model.output_weights, alpha)
         if hasattr(loss_train, "astype"):
             loss_train = loss_train.astype(precision, copy=False)
         loss_train_history.append(loss_train)
