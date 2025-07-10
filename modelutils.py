@@ -197,14 +197,26 @@ class ELM:
             self.output_weights (hidden_size x output_size)
         """
         A = self.hidden_activations(X)  # Compute hidden activations H
-        Q, R = np.linalg.qr(A)  # QR decomposition of H
+        # Q, R = np.linalg.qr(A)  # QR decomposition of H
 
-        # Compute (R^T R + alpha * I) β = R^T Q^T Y
-        RtY = R.T @ Q.T @ Y
-        RtR = R.T @ R + alpha * np.eye(self.hidden_size)
+        # # Compute (R^T R + alpha * I) β = R^T Q^T Y
+        # RtY = R.T @ Q.T @ Y
+        # RtR = R.T @ R + alpha * np.eye(self.hidden_size)
 
-        # Solve for output weights
-        self.output_weights = np.linalg.solve(RtR, RtY)
+        # # Solve for output weights
+        # self.output_weights = np.linalg.solve(RtR, RtY)
+
+        # Concatenate sqrt(alpha) * I to A
+        sqrt_alpha = np.sqrt(alpha)
+        I = np.eye(self.hidden_size)
+        A_aug = np.vstack([A, sqrt_alpha * I])
+        Y_aug = np.vstack([Y, np.zeros((self.hidden_size, self.output_size))])
+
+        # QR decomposition
+        Q, R = np.linalg.qr(A_aug)
+
+        # Solve R β = Q^T Y_aug
+        self.output_weights = np.linalg.solve(R, Q.T @ Y_aug)
 
     def compute_wout_system(self, X, Y, alpha=0):
         """
