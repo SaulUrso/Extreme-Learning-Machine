@@ -1,4 +1,4 @@
-# MLProj19Cm2324
+# Extreme Learning machine
 
 ## Code of the algorithms
 
